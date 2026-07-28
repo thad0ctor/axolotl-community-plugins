@@ -1,0 +1,89 @@
+name: Weekly re-scan
+
+# Advisory databases are retroactive: source that scanned clean months ago can
+# fail today (a new CVE, a newly-flagged malicious dependency). So we re-run the
+# scan wall over every entry's pinned SHA on a schedule, independent of any PR.
+#
+# On a NEWLY failing entry (one not already marked degraded) we flip its
+# `last_scan.status` to "degraded" and open a labelled issue tagging the entry's
+# maintainer. Best effort throughout: one bad entry never aborts the sweep.
+
+on:
+  schedule:
+    # Mondays 06:17 UTC (off the top of the hour to avoid the scheduler stampede).
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write # to commit degraded status
+  issues: write # to open regression issues
+
+concurrency:
+  group: rescan-cron
+  cancel-in-progress: false
+
+jobs:
+  rescan:
+    name: Re-scan all entries at their pinned SHA
+    runs-on: ubuntu-latest
+    env:
+      SEMGREP_SEND_METRICS: "off"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install validator + scanners
+        run: |
+          pip install jsonschema
+          bash .github/scripts/install_scanners.sh
+      - name: Re-scan every entry and flag regressions
+        run: |
+          set -uo pipefail
+          tools="bandit,semgrep,guarddog,pip-audit,gitleaks"
+          gh label create degraded --color B60205 \
+            --description "Re-scan regression" 2>/dev/null || true
+          changed=0
+          for entry in registry/plugins/*.json; do
+            name="$(basename "$entry" .json)"
+            dest="$(mktemp -d)"
+            echo "::group::re-scan ${name}"
+            if scan_dir="$(bash .github/scripts/clone_source.sh "$entry" "$dest")" \
+               && python scripts/run_scans.py "$scan_dir" --name "$name"; then
+              echo "${name}: clean"
+              echo "::endgroup::"
+              continue
+            fi
+
+            prior="$(python .github/scripts/entry_field.py "$entry" last_scan.status)"
+            if [ "$prior" = "degraded" ]; then
+              echo "${name}: still degraded (already flagged); skipping issue"
+              echo "::endgroup::"
+              continue
+            fi
+
+            echo "${name}: NEWLY failing -> marking degraded and opening an issue"
+            python .github/scripts/set_last_scan.py "$entry" --status degraded --tools "$tools"
+            changed=1
+
+            maintainer="$(python .github/scripts/entry_field.py "$entry" maintainer)"
+            title="Re-scan regression: ${name}"
+            # Best effort; do not fail the sweep if the issue API hiccups.
+            if [ -z "$(gh issue list --state open --search "in:title ${title}" --json number --jq '.[].number' 2>/dev/null)" ]; then
+              gh issue create --title "$title" --label degraded \
+                --body "The weekly re-scan of \`${name}\` (pinned SHA) is now failing where it previously passed. This is usually a newly-published advisory against a pinned dependency, or a newly-flagged package. cc @${maintainer} — please review and open a PR bumping \`ref\` to a fixed commit, or add a reviewed waiver." \
+                || echo "WARNING: could not open issue for ${name}"
+            else
+              echo "${name}: an open regression issue already exists; not duplicating"
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "$changed" -eq 1 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add registry/plugins/*.json
+            git commit -m "chore: mark re-scan regressions degraded [skip ci]" || true
+            git push || true
+          fi

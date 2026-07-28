@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "axolotl-marketplace"
+version = "0.1.0"
+description = "Community plugin marketplace client for Axolotl: search and install vetted plugins by name."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+dependencies = ["click>=8.1", "requests>=2.28"]
+
+# This is the "independent app that axolotl installs": once pip-installed, it
+# contributes an `axolotl market` subcommand through the entry point group that
+# axolotl-ai-cloud/axolotl#3840 introduced. No changes to axolotl core required.
+[project.entry-points."axolotl.cli_commands"]
+market = "axolotl_market.cli:market"
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "jsonschema>=4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

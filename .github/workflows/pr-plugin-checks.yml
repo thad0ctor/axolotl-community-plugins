@@ -1,0 +1,79 @@
+name: PR plugin checks
+
+# The sandboxed behavioural job: it installs a real axolotl and runs each changed
+# entry's author-provided `checks:` against it, so a plugin proves its own hooks
+# fire -- something the static scanners cannot do.
+#
+# SECURITY INVARIANT: no plugin code executes until the static scans pass.
+# This workflow enforces that itself rather than trusting a sibling workflow:
+#   * `gate` re-runs the SAME validate + scan-wall from _gate.yml, and
+#   * `plugin-checks` declares `needs: gate`, so it is never scheduled unless the
+#     gate succeeded in THIS run.
+# Cross-workflow status cannot be depended on for a security gate (a fork could
+# race or re-trigger), so we pay the cost of re-running the gate here.
+#
+# Trigger is `pull_request` (untrusted context): read-only token, no secrets.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-plugin-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_gate.yml
+    with:
+      base_sha: ${{ github.event.pull_request.base.sha }}
+
+  plugin-checks:
+    name: Author checks (sandboxed, network disabled)
+    needs: gate # <- the invariant: only runs if validate + scan wall passed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install a real axolotl (pinned to the changed entries' min version)
+        run: |
+          set -euo pipefail
+          mapfile -t entries < <(bash .github/scripts/changed_entries.sh "${{ github.event.pull_request.base.sha }}")
+          # Highest min_axolotl_version across the changed entries satisfies them all.
+          version="$(python .github/scripts/axolotl_pin.py "${entries[@]}")"
+          pip install --upgrade pip
+          if [ -n "$version" ]; then
+            echo "Pinning axolotl==$version"
+            pip install "axolotl==$version" \
+              || pip install "git+https://github.com/axolotl-ai-cloud/axolotl.git@v${version}" \
+              || pip install "git+https://github.com/axolotl-ai-cloud/axolotl.git"
+          else
+            echo "No min_axolotl_version pin; installing latest axolotl"
+            pip install axolotl \
+              || pip install "git+https://github.com/axolotl-ai-cloud/axolotl.git"
+          fi
+      - name: Run author checks in the network-disabled sandbox
+        run: |
+          set -uo pipefail
+          mapfile -t entries < <(bash .github/scripts/changed_entries.sh "${{ github.event.pull_request.base.sha }}")
+          fail=0
+          for entry in "${entries[@]}"; do
+            name="$(basename "$entry" .json)"
+            echo "::group::author checks ${name}"
+            # run_checks_sandboxed.sh pre-provisions clone+deps with network, then
+            # runs run_plugin_checks.py under `unshare -rn` (no egress) so the
+            # install, smoke import and author checks all execute offline.
+            bash .github/scripts/run_checks_sandboxed.sh "$entry" || fail=1
+            echo "::endgroup::"
+          done
+          exit "$fail"

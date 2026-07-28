@@ -1,0 +1,53 @@
+name: Client CI
+
+# Tests the marketplace client package and the registry scripts. This code is
+# first-party (in this repo), so unlike the plugin workflows it is safe to install
+# and import directly. Read-only, no secrets.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Install, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install client (editable, with dev extras)
+        run: pip install -e ".[dev]"
+      - name: Run tests
+        run: |
+          set -uo pipefail
+          pytest tests/ -q
+          rc=$?
+          # Exit 5 = "no tests collected". The suite is not written yet; treat an
+          # empty collection as a pass so CI is green until tests land, but surface
+          # any real failure (non-zero, non-5).
+          if [ "$rc" -eq 5 ]; then
+            echo "No tests collected yet (pytest exit 5); treating as pass."
+            exit 0
+          fi
+          exit "$rc"
+      - name: Lint (only if a ruff config exists)
+        run: |
+          set -euo pipefail
+          if grep -q '\[tool\.ruff' pyproject.toml || ls .ruff.toml ruff.toml >/dev/null 2>&1; then
+            pip install ruff
+            ruff check .
+          else
+            echo "No ruff config found; skipping lint."
+          fi
+      - name: Index is up to date
+        run: python scripts/build_index.py --check

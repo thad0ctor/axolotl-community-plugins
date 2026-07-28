@@ -1,0 +1,21 @@
+rules:
+  - id: axolotl-plugin-no-network-at-import
+    languages: [python]
+    severity: WARNING
+    message: >
+      Network access at module import time. A plugin's top-level code runs during
+      axolotl config load; fetching at import is both a hazard and undeclared behaviour.
+      Move it into a hook that runs during training, or declare it.
+    patterns:
+      - pattern-either:
+          - pattern: requests.$M(...)
+          - pattern: urllib.request.urlopen(...)
+          - pattern: socket.socket(...)
+          - pattern: httpx.$M(...)
+      # Only flag calls at module scope (not inside a function/method body).
+      - pattern-not-inside: |
+          def $F(...):
+              ...
+      - pattern-not-inside: |
+          class $C:
+              ...

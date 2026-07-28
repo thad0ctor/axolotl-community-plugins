@@ -1,0 +1,93 @@
+name: Registry gate
+
+# Reusable gate = schema/rules validation + the static scan wall.
+#
+# It lives in its own file so both the fast PR check (pr-validate.yml) and the
+# sandboxed behavioural workflow (pr-plugin-checks.yml) run the SAME gate. The
+# sandbox workflow calls this and makes its untrusted job `needs:` it, so plugin
+# code can never execute unless this gate passed -- the gate is not trusted across
+# workflows, it is re-run in the same workflow run that will execute the code.
+#
+# Nothing here installs or imports a plugin: entries are validated offline, and
+# the scan wall only clones the source tree and runs static analysers over it.
+
+on:
+  workflow_call:
+    inputs:
+      base_sha:
+        description: PR base SHA, used to diff which entries changed. Empty scans all.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate entries (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so we can diff the PR base against HEAD.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install validator dependency
+        run: pip install jsonschema
+      - name: Validate changed entries against schema + rules
+        run: |
+          set -euo pipefail
+          mapfile -t entries < <(bash .github/scripts/changed_entries.sh "${{ inputs.base_sha }}")
+          echo "Entries to validate:"
+          printf '  %s\n' "${entries[@]}"
+          python scripts/validate_entry.py "${entries[@]}"
+      - name: Index is up to date
+        run: python scripts/build_index.py --check
+
+  scan-wall:
+    name: Static scan wall (source only)
+    runs-on: ubuntu-latest
+    # Disable semgrep telemetry: rules are local, nothing needs to phone home.
+    env:
+      SEMGREP_SEND_METRICS: "off"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install scanners (bandit, semgrep, pip-audit, guarddog, gitleaks)
+        run: bash .github/scripts/install_scanners.sh
+      - name: Clone each changed plugin at its pinned SHA and scan the source
+        run: |
+          set -uo pipefail
+          mapfile -t entries < <(bash .github/scripts/changed_entries.sh "${{ inputs.base_sha }}")
+          echo "## Static scan wall" >> "$GITHUB_STEP_SUMMARY"
+          fail=0
+          for entry in "${entries[@]}"; do
+            name="$(basename "$entry" .json)"
+            dest="$(mktemp -d)"
+            echo "::group::scan ${name}"
+            # Only clone the source tree here; nothing is installed or imported.
+            if scan_dir="$(bash .github/scripts/clone_source.sh "$entry" "$dest")"; then
+              out="$(python scripts/run_scans.py "$scan_dir" --name "$name" 2>&1)"
+              rc=$?
+            else
+              out="FAIL: could not clone ${name} source at its pinned SHA"
+              rc=1
+            fi
+            echo "$out"
+            {
+              echo "### ${name}"
+              echo '```'
+              echo "$out" | tail -n 25
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            [ "$rc" -ne 0 ] && fail=1
+            echo "::endgroup::"
+          done
+          exit "$fail"

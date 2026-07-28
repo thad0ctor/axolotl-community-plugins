@@ -1,0 +1,84 @@
+name: Stamp merged entries
+
+# Post-merge stamping. Runs on push to main (trusted context), re-runs the gate
+# over the merged entries, and writes each entry's `last_scan` (date + tools +
+# status), then commits it back as the actions bot.
+#
+# WHY POST-MERGE, AND WHY RE-RUN INSTEAD OF TRUSTING THE PR:
+#   * A PR runs in an untrusted, read-only context (fork-safe). Its artifacts /
+#     job outputs cannot be trusted to stamp the registry -- a fork could forge a
+#     "passed" result. So we do not carry anything over from the PR run.
+#   * On main the token is trusted (contents: write), so this is the only place a
+#     `last_scan` may be written. validate_entry.py enforces that submitters leave
+#     it null precisely so this stamp is the sole writer.
+#
+# Loop safety: commits made with GITHUB_TOKEN do not trigger further workflow
+# runs, and we also tag the commit [skip ci] and only commit when something
+# actually changed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - registry/plugins/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stamp-main
+  cancel-in-progress: false
+
+jobs:
+  stamp:
+    name: Re-scan merged entries and write last_scan
+    runs-on: ubuntu-latest
+    env:
+      SEMGREP_SEND_METRICS: "off"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install validator + scanners
+        run: |
+          pip install jsonschema
+          bash .github/scripts/install_scanners.sh
+      - name: Re-validate, re-scan, and stamp each merged entry
+        run: |
+          set -uo pipefail
+          # Entries touched by this push; falls back to all if the range is unknown.
+          mapfile -t entries < <(bash .github/scripts/changed_entries.sh "${{ github.event.before }}")
+          python scripts/validate_entry.py "${entries[@]}"
+          tools="bandit,semgrep,guarddog,pip-audit,gitleaks"
+          for entry in "${entries[@]}"; do
+            name="$(basename "$entry" .json)"
+            dest="$(mktemp -d)"
+            echo "::group::re-scan ${name}"
+            # Best effort per entry: one entry that fails to clone/scan must not
+            # abort stamping of the rest. Its status is recorded as degraded.
+            if scan_dir="$(bash .github/scripts/clone_source.sh "$entry" "$dest")" \
+               && python scripts/run_scans.py "$scan_dir" --name "$name"; then
+              status="pass"
+            else
+              status="degraded"
+            fi
+            python .github/scripts/set_last_scan.py "$entry" --status "$status" --tools "$tools"
+            echo "::endgroup::"
+          done
+      - name: Rebuild index
+        run: python scripts/build_index.py
+      - name: Commit stamps
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add registry/plugins/*.json registry/index.json
+          if git diff --cached --quiet; then
+            echo "No stamp changes to commit."
+          else
+            git commit -m "chore: stamp last_scan [skip ci]"
+            git push
+          fi

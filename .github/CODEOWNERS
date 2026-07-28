@@ -1,0 +1,23 @@
+# CODEOWNERS for axolotl-community-plugins
+#
+# NOTE: the teams below are PLACEHOLDERS. Replace them with the real GitHub
+# teams once the registry is homed under axolotl-ai-cloud. The point of this
+# file is the review *policy*, not the specific handles.
+#
+# For the security-critical paths to actually require sign-off, pair this file
+# with a branch-protection rule that enables "Require review from Code Owners".
+
+# --- Default: lighter-touch review for the client, scripts, rules, and docs ---
+*                       @axolotl-ai-cloud/maintainers
+
+# --- Security-critical: every listing and every scanner waiver is a trust
+#     decision and must be reviewed by the plugin reviewers. ---
+/registry/              @axolotl-ai-cloud/plugin-reviewers
+/waivers/               @axolotl-ai-cloud/plugin-reviewers
+
+# The scan rules and scan/stamp scripts define what "vetted" means, so changes
+# to them are trust decisions too.
+/rules/                 @axolotl-ai-cloud/plugin-reviewers
+/scripts/run_scans.py   @axolotl-ai-cloud/plugin-reviewers
+/scripts/run_plugin_checks.py  @axolotl-ai-cloud/plugin-reviewers
+/scripts/validate_entry.py     @axolotl-ai-cloud/plugin-reviewers

@@ -1,0 +1,34 @@
+name: PR validate
+
+# Fast, fork-safe PR gate: schema/rules validation + the static scan wall.
+#
+# Trigger is `pull_request`, NOT `pull_request_target`: this workflow checks out
+# and processes UNTRUSTED PR content (the submitted entry, and the plugin source
+# it points at). pull_request runs with a read-only token and NO secrets, so even
+# though we clone third-party source and run analysers over it, there is nothing
+# here for malicious content to steal or write. (pull_request_target would run in
+# the base-repo context with secrets available -- exactly what we must avoid when
+# touching untrusted input.)
+#
+# This is the quick required check. The heavier, sandboxed behavioural job that
+# actually executes plugin code lives in pr-plugin-checks.yml and re-runs this
+# same gate before doing so.
+
+on:
+  pull_request:
+
+# Least privilege: read-only, no write scopes, no secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_gate.yml
+    with:
+      base_sha: ${{ github.event.pull_request.base.sha }}

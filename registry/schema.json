@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/axolotl-ai-cloud/axolotl-community-plugins/registry/schema.json",
+  "title": "Axolotl community plugin entry",
+  "description": "One file per plugin under registry/plugins/<name>.json. Adding or updating an entry is a PR that CI validates, scans, and runs the plugin's own checks against.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description", "source", "ref", "cls", "capabilities", "maintainer", "license", "checks"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,40}$",
+      "description": "Unique registry name; also the install-by-name key. Lowercase, digits, hyphens."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 200
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[^/]+/[^/]+?(\\.git)?$",
+      "description": "GitHub HTTPS URL of the plugin repo. GitHub-only in v1 (keeps clone + provenance simple)."
+    },
+    "ref": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full 40-char commit SHA. No branches or tags: an entry may not point at a moving ref, so the scan that approved it always describes the exact code."
+    },
+    "subdir": {
+      "type": ["string", "null"],
+      "description": "Subdirectory within the repo that holds the plugin package, if not the root."
+    },
+    "cls": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$"},
+      "minItems": 1,
+      "description": "Dotted path(s) to the BasePlugin subclass(es) this entry provides."
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {"enum": ["callbacks", "cli_commands", "config_args", "model_patches", "trainers", "datasets", "rewards"]},
+      "minItems": 1,
+      "description": "Declared hook surface. CI's capability check fails if the code reaches outside what is declared here."
+    },
+    "install_mode": {
+      "enum": ["auto", "pip", "syspath"],
+      "default": "auto",
+      "description": "How `axolotl plugins install` should install it (passed through as --mode)."
+    },
+    "min_axolotl_version": {
+      "type": ["string", "null"],
+      "description": "Lowest axolotl version known to work, e.g. \"0.18.0\"."
+    },
+    "maintainer": {
+      "type": "string",
+      "description": "GitHub handle of the person responsible for this entry."
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX identifier, e.g. \"Apache-2.0\"."
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Author-provided verification steps, run inside the sandbox against a real axolotl after install. This is how a plugin proves its own hooks fire, beyond the generic scans. Each check runs with the plugin repo checked out at `ref` as the working directory.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "run"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 60},
+          "run": {"type": "string", "minLength": 1, "description": "Shell command run in the sandbox (network disabled). Non-zero exit fails the submission."},
+          "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 1800, "default": 300}
+        }
+      }
+    },
+    "last_scan": {
+      "type": ["object", "null"],
+      "description": "Written by CI on merge, never by the submitter. Records what ran and when.",
+      "additionalProperties": true
+    }
+  }
+}
