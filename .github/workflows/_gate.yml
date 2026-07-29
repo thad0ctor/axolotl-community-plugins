@@ -32,7 +32,7 @@ jobs:
         with:
           # Full history so we can diff the PR base against HEAD.
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install validator dependency
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install scanners (bandit, semgrep, pip-audit, guarddog, gitleaks)
