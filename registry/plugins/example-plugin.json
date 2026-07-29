@@ -37,6 +37,6 @@
       "pip-audit",
       "gitleaks"
     ],
-    "status": "degraded"
+    "status": "pass"
   }
 }
