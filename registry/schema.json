@@ -19,8 +19,8 @@
     },
     "source": {
       "type": "string",
-      "pattern": "^https://github\\.com/[^/]+/[^/]+?(\\.git)?$",
-      "description": "GitHub HTTPS URL of the plugin repo. GitHub-only in v1 (keeps clone + provenance simple)."
+      "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?(\\.git)?$",
+      "description": "GitHub HTTPS URL of the plugin repo. GitHub-only in v1 (keeps clone + provenance simple). Owner/repo are restricted to GitHub-legal characters, so no whitespace/newlines or path tricks."
     },
     "ref": {
       "type": "string",
@@ -29,7 +29,8 @@
     },
     "subdir": {
       "type": ["string", "null"],
-      "description": "Subdirectory within the repo that holds the plugin package, if not the root."
+      "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_][A-Za-z0-9_./-]*$",
+      "description": "Subdirectory within the repo that holds the plugin package, if not the root. A relative path only: no leading '-' (would be read as an option by the installer), no leading '/', and no '..' (would escape the checkout)."
     },
     "cls": {
       "type": "array",
@@ -50,6 +51,7 @@
     },
     "min_axolotl_version": {
       "type": ["string", "null"],
+      "pattern": "^[0-9]+(\\.[0-9]+)*$",
       "description": "Lowest axolotl version known to work, e.g. \"0.18.0\"."
     },
     "maintainer": {

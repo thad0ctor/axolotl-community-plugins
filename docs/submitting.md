@@ -178,11 +178,16 @@ After the maintainers merge, a trusted post-merge job re-runs the scans and writ
 
 ## 6. Waivers
 
-If the scan wall flags a finding you believe is a false positive or an accepted risk, you
-do not edit the scanners — you add a **`waivers/<name>.yml`** in the *same PR*, with a
-written justification for each finding you want suppressed. That file lives under a path
-that [CODEOWNERS](../.github/CODEOWNERS) puts under mandatory review, so a reviewer makes
-one small, focused judgment call instead of auditing the whole plugin.
+> **v0.1 status: not yet enabled.** Right now every scan-wall finding is a hard fail —
+> there is no waiver mechanism wired up, so a flagged finding must be *fixed*, not waived.
+> The design below is what waivers will look like once implemented; it is here so the flow
+> is understood, not because you can use it today.
+
+Once enabled: if the scan wall flags a finding you believe is a false positive or an
+accepted risk, you will not edit the scanners — you will add a **`waivers/<name>.yml`** in
+the *same PR*, with a written justification for each finding you want suppressed. That file
+lives under a path that [CODEOWNERS](../.github/CODEOWNERS) puts under mandatory review, so
+a reviewer makes one small, focused judgment call instead of auditing the whole plugin.
 
 Notes and current limits:
 

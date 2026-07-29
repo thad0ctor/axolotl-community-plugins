@@ -12,18 +12,28 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 REGISTRY_URL_ENV = "AXOLOTL_MARKET_REGISTRY_URL"
 REGISTRY_PATH_ENV = "AXOLOTL_MARKET_REGISTRY_PATH"
-# A specific tag/commit of the registry repo is pinned here per client release, so a
-# client version always resolves against a known registry snapshot rather than main.
+# The registry repo ref the client reads. v0.1 tracks `main`; a release should pin this
+# to a tag/commit so a client version resolves against a fixed snapshot. Overridable via
+# AXOLOTL_MARKET_REGISTRY_URL for testing.
 DEFAULT_REGISTRY_REF = "main"
 DEFAULT_REGISTRY_RAW = (
     "https://raw.githubusercontent.com/axolotl-ai-cloud/"
     f"axolotl-community-plugins/{DEFAULT_REGISTRY_REF}"
 )
+
+# The fields that reach `axolotl plugins install` as argv are re-validated client-side
+# with the same shape the registry schema enforces, so a compromised or overridden
+# registry cannot feed an option-shaped or non-GitHub value into the installer.
+_SOURCE_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?(\.git)?$")
+_REF_RE = re.compile(r"^[0-9a-f]{40}$")
+_SUBDIR_RE = re.compile(r"^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9_./-]*$")
+_CLS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 
 
 class RegistryError(RuntimeError):
@@ -50,7 +60,21 @@ class PluginEntry:
             "name", "description", "source", "ref", "cls", "capabilities",
             "subdir", "install_mode", "min_axolotl_version", "maintainer", "license",
         }
-        return cls(**{k: v for k, v in data.items() if k in fields})
+        entry = cls(**{k: v for k, v in data.items() if k in fields})
+        entry._validate()
+        return entry
+
+    def _validate(self) -> None:
+        if not _SOURCE_RE.match(self.source or ""):
+            raise RegistryError(f"Entry {self.name!r}: unsafe source {self.source!r}.")
+        if not _REF_RE.match(self.ref or ""):
+            raise RegistryError(f"Entry {self.name!r}: ref must be a 40-char SHA.")
+        if self.subdir is not None and not _SUBDIR_RE.match(self.subdir):
+            raise RegistryError(f"Entry {self.name!r}: unsafe subdir {self.subdir!r}.")
+        if self.install_mode not in ("auto", "pip", "syspath"):
+            raise RegistryError(f"Entry {self.name!r}: bad install_mode {self.install_mode!r}.")
+        if not self.cls or not all(isinstance(c, str) and _CLS_RE.match(c) for c in self.cls):
+            raise RegistryError(f"Entry {self.name!r}: invalid cls {self.cls!r}.")
 
     def install_args(self) -> list[str]:
         """The exact `axolotl plugins install` argv this entry resolves to."""

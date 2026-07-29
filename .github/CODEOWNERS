@@ -21,3 +21,9 @@
 /scripts/run_scans.py   @axolotl-ai-cloud/plugin-reviewers
 /scripts/run_plugin_checks.py  @axolotl-ai-cloud/plugin-reviewers
 /scripts/validate_entry.py     @axolotl-ai-cloud/plugin-reviewers
+/scripts/check_capabilities.py @axolotl-ai-cloud/plugin-reviewers
+
+# The workflows and their helper scripts define what "sandboxed" means, so they
+# are trust decisions too and must not fall to the lighter default review.
+/.github/workflows/     @axolotl-ai-cloud/plugin-reviewers
+/.github/scripts/       @axolotl-ai-cloud/plugin-reviewers

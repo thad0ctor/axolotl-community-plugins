@@ -12,10 +12,9 @@ rules:
           - pattern: urllib.request.urlopen(...)
           - pattern: socket.socket(...)
           - pattern: httpx.$M(...)
-      # Only flag calls at module scope (not inside a function/method body).
+      # Flag calls that run at import: module scope AND class-body scope (a class body
+      # executes when the module is imported). Only calls inside a function/method are
+      # deferred to call time, so those are excluded.
       - pattern-not-inside: |
           def $F(...):
-              ...
-      - pattern-not-inside: |
-          class $C:
               ...

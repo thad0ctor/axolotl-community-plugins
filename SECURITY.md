@@ -28,19 +28,22 @@ the table). Each layer targets a distinct failure class, because Python security
 overlap very little in what they detect:
 
 - **Static scan wall** (`scripts/run_scans.py`), over the source tree at the pinned SHA,
-  with **no plugin code executed**: bandit (dangerous patterns), semgrep with
-  Axolotl-specific rules (network-at-import, monkeypatching internals, undeclared
-  capabilities), guarddog (malicious-package heuristics), pip-audit (known CVEs in
-  declared deps), and gitleaks (committed secrets).
+  with **no plugin code executed**: bandit (dangerous patterns), semgrep (network access
+  at import — one heuristic rule today, more planned), a **capability check**
+  (`scripts/check_capabilities.py`, AST-only: fails if the code overrides a `BasePlugin`
+  hook whose capability the entry did not declare), guarddog (malicious-package
+  heuristics), pip-audit (known CVEs in a declared `requirements.txt`), and gitleaks
+  (committed secrets).
 - **Sandboxed author checks** (`scripts/run_plugin_checks.py`), *after* the wall passes:
   install in a sandbox with the network disabled, confirm each class is a `BasePlugin`
   subclass, then run the plugin's own `checks:`.
 - **Post-merge stamping** and a **weekly re-scan** so retroactive advisories (new CVEs on
   unchanged code) surface over time.
 
-Hard-fail gates (guarddog, gitleaks) block a listing outright, and a hard-fail scanner
-that cannot run is treated as a failure, never a pass. Other findings are waivable only
-through a `waivers/<name>.yml` reviewed in the same PR under CODEOWNERS.
+Hard-fail gates (guarddog, gitleaks, the capability check) block a listing outright, and
+a hard-fail scanner that cannot run is treated as a failure, never a pass. **In v0.1
+every finding is a hard fail** — the waiver flow below is designed but not yet wired up,
+so a finding must be fixed, not waived, for now.
 
 ## What the gates do NOT guarantee
 
@@ -55,8 +58,9 @@ and we are not going to paper over it:
 - **A passing listing is not an endorsement.** The maintainers do not commit to reading
   every plugin line by line. Trust the scan results for what they are — evidence, not a
   warranty.
-- **Waivers are human judgment.** A waived finding is a reviewer deciding a specific
-  flagged pattern is acceptable. That is a judgment call, not proof of safety.
+- **Waivers (once enabled) are human judgment.** A waived finding is a reviewer deciding
+  a specific flagged pattern is acceptable. That is a judgment call, not proof of safety.
+  Not yet enabled in v0.1.
 
 ## What the sandbox protects — and what it doesn't
 

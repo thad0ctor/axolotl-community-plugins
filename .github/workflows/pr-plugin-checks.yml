@@ -42,6 +42,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # This job installs and runs untrusted plugin code; do not leave the
+          # checkout token in .git/config where a setup.py or import could read it.
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

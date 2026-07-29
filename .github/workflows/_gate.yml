@@ -50,6 +50,9 @@ jobs:
   scan-wall:
     name: Static scan wall (source only)
     runs-on: ubuntu-latest
+    # Validate first: the wall clones at the entry's `ref` and scans its `subdir`, so
+    # those fields must have passed schema validation before we act on them.
+    needs: validate
     # Disable semgrep telemetry: rules are local, nothing needs to phone home.
     env:
       SEMGREP_SEND_METRICS: "off"
@@ -74,7 +77,9 @@ jobs:
             echo "::group::scan ${name}"
             # Only clone the source tree here; nothing is installed or imported.
             if scan_dir="$(bash .github/scripts/clone_source.sh "$entry" "$dest")"; then
-              out="$(python scripts/run_scans.py "$scan_dir" --name "$name" 2>&1)"
+              # --entry enables the capability check (declared capabilities must cover
+              # the hooks the code overrides).
+              out="$(python scripts/run_scans.py "$scan_dir" --entry "$entry" 2>&1)"
               rc=$?
             else
               out="FAIL: could not clone ${name} source at its pinned SHA"

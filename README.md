@@ -88,14 +88,18 @@ Adding or updating an entry is a PR. CI runs, in order:
 
    | Layer | Catches | Gate |
    |---|---|---|
-   | bandit | dangerous patterns (`eval`/`exec`, `pickle`, `shell=True`, …) | fail, waivable |
-   | semgrep (+ Axolotl rules) | network-at-import, monkeypatching internals, undeclared capabilities | fail, waivable |
+   | bandit | dangerous patterns (`eval`/`exec`, `pickle`, `shell=True`, …) | fail |
+   | semgrep | network access at import (one heuristic rule today; more planned) | fail |
+   | capability check | overriding a `BasePlugin` hook whose capability is not declared (AST, no execution) | **hard fail** |
    | guarddog | malicious-package heuristics | **hard fail** |
-   | pip-audit | known CVEs in declared dependencies | fail, waivable |
+   | pip-audit | known CVEs in a declared `requirements.txt`; `pyproject`/`setup` deps are audited in the sandbox after install | fail |
    | gitleaks | committed secrets | **hard fail** |
 
-   A hard-fail scanner that cannot run is treated as a failure, never a pass. Waivable
-   findings can be suppressed only by a `waivers/<name>.yml` reviewed in the same PR.
+   A hard-fail scanner that cannot run is treated as a failure, never a pass. **v0.1
+   note:** waivers are not yet enforced — every scanner finding is a hard fail, so a
+   finding must be fixed, not waived. The waiver flow (`waivers/<name>.yml` reviewed in
+   the same PR) is designed (see docs) but not wired up yet. Monkeypatch detection is
+   also still planned, not implemented.
 
 3. **Sandboxed author checks** — only if the wall passes. `scripts/run_plugin_checks.py`
    clones the plugin at the pinned SHA, installs it in a sandbox, confirms each declared

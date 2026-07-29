@@ -73,6 +73,26 @@ def test_resolve_unknown_name_raises(local_registry):
         resolve("does-not-exist")
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("source", "https://evil.com/a/b"),
+        ("source", "ext::sh -c id"),
+        ("ref", "not-a-sha"),
+        ("subdir", "../../etc"),
+        ("subdir", "--evil-flag"),
+        ("cls", ["a.B; rm -rf"]),
+        ("install_mode", "curl|sh"),
+    ],
+)
+def test_fetched_entry_with_unsafe_field_is_rejected(field, value):
+    # The client re-validates before any field reaches the axolotl argv, so a
+    # compromised or overridden registry cannot inject.
+    bad = {**ENTRY, field: value}
+    with pytest.raises(RegistryError):
+        PluginEntry.from_dict(bad)
+
+
 def test_the_shipped_seed_entry_loads(monkeypatch):
     # Point at the real repo checkout so a broken seed entry fails loudly here.
     from pathlib import Path
