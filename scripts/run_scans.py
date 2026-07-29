@@ -67,7 +67,11 @@ def scan(source: Path, entry: dict | None = None) -> int:
         record("semgrep", _run(["semgrep", "--error", "--no-git-ignore", "--config", str(SEMGREP_RULES), str(source)]), True)
     else:
         record("semgrep", 1, False)
-    record("guarddog", _run(["guarddog", "pypi", "scan", str(source)]) if _have("guarddog") else 1, _have("guarddog"))
+    # --exit-non-zero-on-finding is REQUIRED: without it guarddog exits 0 even when it
+    # finds malware, so the hard gate would never trip. guarddog runs its rules through
+    # its own bundled semgrep, so that semgrep must be version-compatible (pinned as a
+    # pair in .github/scanners/requirements.txt) or the rules silently find nothing.
+    record("guarddog", _run(["guarddog", "pypi", "scan", "--exit-non-zero-on-finding", str(source)]) if _have("guarddog") else 1, _have("guarddog"))
 
     # pip-audit only audits an explicit requirements list here; pyproject/setup deps are
     # resolved and audited in the sandbox install stage. Record SKIP (not pass) when it

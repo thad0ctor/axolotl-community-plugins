@@ -40,6 +40,15 @@ overlap very little in what they detect:
 - **Post-merge stamping** and a **weekly re-scan** so retroactive advisories (new CVEs on
   unchanged code) surface over time.
 
+Keeping the scanners current has two independent parts. Advisory *data* stays fresh on
+its own: pip-audit queries the OSV/PyPI advisory databases at run time, and the weekly
+re-scan re-runs every entry so a newly-disclosed CVE surfaces even on unchanged code. The
+scanner *tool versions* are pinned in `.github/scanners/requirements.txt` and bumped by
+Dependabot; every bump PR runs `scanner-selftest.yml`, which proves the wall still flags a
+known-malicious fixture and still passes a benign one — so a bump that silently breaks
+detection (a changed CLI, an exit-code change, or a guarddog↔semgrep version mismatch)
+fails CI and does not merge.
+
 Hard-fail gates (guarddog, gitleaks, the capability check) block a listing outright, and
 a hard-fail scanner that cannot run is treated as a failure, never a pass. **In v0.1
 every finding is a hard fail** — the waiver flow below is designed but not yet wired up,

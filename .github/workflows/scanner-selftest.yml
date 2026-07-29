@@ -1,0 +1,40 @@
+name: Scanner self-test
+
+# Proves the scan wall still DETECTS after a scanner version/config change. This is the
+# guard that makes automated dependency bumps safe: a Dependabot PR that bumps a scanner
+# must keep flagging the malicious fixture, or this fails and the bump does not merge.
+#
+# Runs on any change to the scanners, their rules, or the wall itself; weekly to catch a
+# scanner that regresses upstream even with no config change; and on demand.
+
+on:
+  pull_request:
+    paths:
+      - .github/scanners/**
+      - .github/scripts/install_scanners.sh
+      - .github/scripts/scanner_selftest.py
+      - scripts/run_scans.py
+      - scripts/check_capabilities.py
+      - rules/**
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    name: Scan wall detects malicious, passes benign
+    runs-on: ubuntu-latest
+    env:
+      SEMGREP_SEND_METRICS: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the scan-wall tools
+        run: bash .github/scripts/install_scanners.sh
+      - name: Wall must be loud on malicious, quiet on benign
+        run: python .github/scripts/scanner_selftest.py

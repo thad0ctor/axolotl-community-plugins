@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # Scan-wall tool versions. A bump PR here triggers scanner-selftest.yml (it watches
+  # .github/scanners/**), which fails the PR if the bump breaks detection -- so these
+  # can be reviewed (or auto-merged) on green with confidence.
+  - package-ecosystem: pip
+    directory: /.github/scanners
+    schedule:
+      interval: weekly
+    groups:
+      scanners:
+        patterns: ["*"]
+    labels: ["scanners", "dependencies"]
+
+  # The marketplace client's own dependencies.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ["dependencies"]
+
+  # Pinned GitHub Actions (checkout, setup-python, ...).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ["ci", "dependencies"]
+
+# Note: gitleaks is installed from a GitHub release binary in install_scanners.sh, which
+# Dependabot's pip/actions ecosystems do not track. The weekly scanner-selftest catches a
+# gitleaks that regresses; bumping GITLEAKS_VERSION is manual (or via Renovate's
+# github-releases datasource if this repo later adopts Renovate).

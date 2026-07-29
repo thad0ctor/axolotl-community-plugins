@@ -1,0 +1,10 @@
+# Pinned versions of the static scan-wall tools. Single source of truth so Dependabot
+# can propose bumps here and CI (scanner-selftest.yml) proves each bump still detects.
+#
+# guarddog and semgrep are a COMPATIBLE PAIR: guarddog runs its malware rules through
+# semgrep, and a mismatched semgrep makes those rules silently error and find nothing.
+# Bump them together; the self-test will fail a bump that breaks detection.
+bandit==1.7.9
+semgrep==1.172.0
+pip-audit==2.7.3
+guarddog==2.7.1

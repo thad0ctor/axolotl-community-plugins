@@ -15,13 +15,14 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.18.4}"
 
 echo "::group::pip scanners"
 python3 -m pip install --upgrade pip
-# Install each independently: one scanner that fails to resolve must not take the
+# Versions live in .github/scanners/requirements.txt (Dependabot bumps them there).
+# Install each line independently: one scanner that fails to resolve must not take the
 # others down with it (a single bundled install means one bad pin => all MISSING).
 # run_scans.py reports whatever ended up unavailable and hard-fails on the hard gates.
-python3 -m pip install "bandit==1.7.9"    || echo "::warning::bandit failed to install"
-python3 -m pip install "semgrep==1.86.0"  || echo "::warning::semgrep failed to install"
-python3 -m pip install "pip-audit==2.7.3" || echo "::warning::pip-audit failed to install"
-python3 -m pip install "guarddog==2.7.1"  || echo "::warning::guarddog failed to install"
+req="$(dirname "$0")/../scanners/requirements.txt"
+grep -vE '^\s*(#|$)' "$req" | while read -r pkg; do
+  python3 -m pip install "$pkg" || echo "::warning::${pkg} failed to install"
+done
 echo "::endgroup::"
 
 echo "::group::gitleaks ${GITLEAKS_VERSION}"
