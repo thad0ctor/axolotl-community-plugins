@@ -45,7 +45,7 @@ jobs:
           # This job installs and runs untrusted plugin code; do not leave the
           # checkout token in .git/config where a setup.py or import could read it.
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install a real axolotl (pinned to the changed entries' min version)
