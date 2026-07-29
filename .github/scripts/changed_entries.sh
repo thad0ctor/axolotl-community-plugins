@@ -31,7 +31,9 @@ if ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
   exit 0
 fi
 
-changed="$(git diff --name-only "${base_sha}" HEAD -- 'registry/plugins/*.json' || true)"
+# --diff-filter=d excludes Deleted paths: a renamed or removed entry leaves a path
+# that no longer exists on disk, which would crash the validator/scanner downstream.
+changed="$(git diff --name-only --diff-filter=d "${base_sha}" HEAD -- 'registry/plugins/*.json' || true)"
 if [[ -z "${changed}" ]]; then
   list_all
 else

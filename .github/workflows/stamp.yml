@@ -21,6 +21,8 @@ on:
     branches: [main]
     paths:
       - registry/plugins/**
+  # Manual trigger: re-stamp every entry (e.g. after a CI fix, or a first import).
+  workflow_dispatch:
 
 permissions:
   contents: write
