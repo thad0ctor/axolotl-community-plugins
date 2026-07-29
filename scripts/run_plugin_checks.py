@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess  # nosec: commands come from a schema-validated entry, run in a sandbox
 import sys
 import tempfile
@@ -33,15 +34,27 @@ from pathlib import Path
 ALL_STAGES = ("fetch", "install", "smoke", "checks")
 
 
-def _run(cmd: list[str], cwd: Path | None = None, timeout: int | None = None) -> int:
+def _run(
+    cmd: list[str],
+    cwd: Path | None = None,
+    timeout: int | None = None,
+    env: dict[str, str] | None = None,
+) -> int:
     print(f"    $ {' '.join(cmd)}", flush=True)
     try:
         return subprocess.run(  # nosec
-            cmd, cwd=str(cwd) if cwd else None, timeout=timeout, check=False
+            cmd, cwd=str(cwd) if cwd else None, timeout=timeout, check=False, env=env
         ).returncode
     except subprocess.TimeoutExpired:
         print(f"    TIMEOUT after {timeout}s")
         return 124
+
+
+def _checks_env() -> dict[str, str]:
+    # A check runs `python`/`pytest`; make those resolve to the interpreter that just
+    # installed the plugin, not whatever a login shell's PATH would pick.
+    bindir = str(Path(sys.executable).parent)
+    return {**os.environ, "PATH": bindir + os.pathsep + os.environ.get("PATH", "")}
 
 
 def _checkout_dir(workdir: Path) -> Path:
@@ -94,12 +107,16 @@ def stage_smoke(entry: dict, workdir: Path) -> int:
 
 def stage_checks(entry: dict, workdir: Path) -> int:
     root = _root(entry, workdir)
+    env = _checks_env()
     for check in entry["checks"]:
         print(f"[{entry['name']}] check: {check['name']}")
+        # bash -c, not -lc: a login shell would reload the profile PATH and could shadow
+        # the interpreter that installed the plugin.
         rc = _run(
-            ["bash", "-lc", check["run"]],
+            ["bash", "-c", check["run"]],
             cwd=root,
             timeout=check.get("timeout_seconds", 300),
+            env=env,
         )
         if rc != 0:
             print(f"[{entry['name']}] FAIL: check {check['name']!r} exited {rc}")

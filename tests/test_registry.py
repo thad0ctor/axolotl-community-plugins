@@ -100,4 +100,4 @@ def test_the_shipped_seed_entry_loads(monkeypatch):
     repo_root = Path(__file__).resolve().parent.parent
     monkeypatch.setenv(REGISTRY_PATH_ENV, str(repo_root))
     names = [e.name for e in load_entries()]
-    assert "example-callback" in names
+    assert "example-plugin" in names
