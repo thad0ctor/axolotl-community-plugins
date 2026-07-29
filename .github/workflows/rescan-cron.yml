@@ -50,7 +50,7 @@ jobs:
             dest="$(mktemp -d)"
             echo "::group::re-scan ${name}"
             if scan_dir="$(bash .github/scripts/clone_source.sh "$entry" "$dest")" \
-               && python scripts/run_scans.py "$scan_dir" --name "$name"; then
+               && python scripts/run_scans.py "$scan_dir" --entry "$entry"; then
               echo "${name}: clean"
               echo "::endgroup::"
               continue

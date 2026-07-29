@@ -62,7 +62,7 @@ jobs:
             # Best effort per entry: one entry that fails to clone/scan must not
             # abort stamping of the rest. Its status is recorded as degraded.
             if scan_dir="$(bash .github/scripts/clone_source.sh "$entry" "$dest")" \
-               && python scripts/run_scans.py "$scan_dir" --name "$name"; then
+               && python scripts/run_scans.py "$scan_dir" --entry "$entry"; then
               status="pass"
             else
               status="degraded"
