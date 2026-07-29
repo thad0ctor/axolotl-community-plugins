@@ -34,7 +34,7 @@ def _entry_files(argv: list[str]) -> list[Path]:
     return sorted(PLUGINS_DIR.glob("*.json"))
 
 
-def validate_file(path: Path) -> list[str]:
+def validate_file(path: Path, allow_stamped: bool = False) -> list[str]:
     errors: list[str] = []
     try:
         data = json.loads(path.read_text())
@@ -50,22 +50,28 @@ def validate_file(path: Path) -> list[str]:
         errors.append(
             f"{path.name}: filename must match the `name` field ({data['name']}.json)."
         )
-    for field in _CI_OWNED:
-        if data.get(field) not in (None, {}, []):
-            errors.append(
-                f"{path.name}: `{field}` is written by CI on merge; leave it null."
-            )
+    # The CI-owned fields must be null in a *submission*; stamp/rescan operate on
+    # already-stamped entries and pass --allow-stamped to exempt them.
+    if not allow_stamped:
+        for field in _CI_OWNED:
+            if data.get(field) not in (None, {}, []):
+                errors.append(
+                    f"{path.name}: `{field}` is written by CI on merge; leave it null."
+                )
     return errors
 
 
 def main(argv: list[str]) -> int:
+    allow_stamped = "--allow-stamped" in argv
+    argv = [a for a in argv if a != "--allow-stamped"]
+
     errors: list[str] = []
     files = _entry_files(argv)
     if not files:
         print("No entries to validate.")
         return 0
     for path in files:
-        errors.extend(validate_file(path))
+        errors.extend(validate_file(path, allow_stamped=allow_stamped))
 
     if errors:
         print("Registry validation FAILED:")

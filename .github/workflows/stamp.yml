@@ -53,7 +53,7 @@ jobs:
           set -uo pipefail
           # Entries touched by this push; falls back to all if the range is unknown.
           mapfile -t entries < <(bash .github/scripts/changed_entries.sh "${{ github.event.before }}")
-          python scripts/validate_entry.py "${entries[@]}"
+          python scripts/validate_entry.py --allow-stamped "${entries[@]}"
           tools="bandit,semgrep,guarddog,pip-audit,gitleaks"
           for entry in "${entries[@]}"; do
             name="$(basename "$entry" .json)"
