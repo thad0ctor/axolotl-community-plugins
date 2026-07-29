@@ -4,8 +4,14 @@
   "source": "https://github.com/thad0ctor/axolotl-example-plugin",
   "ref": "3bf76a4b29a59a2bee4b093f2c49c4e9f0d7303d",
   "subdir": null,
-  "cls": ["axolotl_example_plugin.ExamplePlugin"],
-  "capabilities": ["callbacks", "config_args", "model_patches"],
+  "cls": [
+    "axolotl_example_plugin.ExamplePlugin"
+  ],
+  "capabilities": [
+    "callbacks",
+    "config_args",
+    "model_patches"
+  ],
   "install_mode": "auto",
   "min_axolotl_version": "0.18.0",
   "maintainer": "thad0ctor",
@@ -22,5 +28,15 @@
       "timeout_seconds": 120
     }
   ],
-  "last_scan": null
+  "last_scan": {
+    "date": "2026-07-29",
+    "tools": [
+      "bandit",
+      "semgrep",
+      "guarddog",
+      "pip-audit",
+      "gitleaks"
+    ],
+    "status": "degraded"
+  }
 }
